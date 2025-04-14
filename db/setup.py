@@ -1,4 +1,3 @@
-# db/setup_db.py
 import psycopg2
 from dotenv import load_dotenv
 import os
@@ -10,11 +9,11 @@ def run_sql_script(path: str):
         sql = f.read()
 
     conn = psycopg2.connect(
-        dbname=os.getenv("DATABASE_NAME"),
-        user=os.getenv("DATABASE_USER"),
-        password=os.getenv("DATABASE_PASSWORD"),
-        host="localhost",
-        port=5432,
+        dbname = os.getenv("DATABASE_NAME"),
+        user = os.getenv("DATABASE_USER"),
+        password = os.getenv("DATABASE_PASSWORD"),
+        host = os.getenv("DATABASE_HOST"),
+        port = int(os.getenv("DATABASE_PORT")),
     )
     cur = conn.cursor()
     cur.execute(sql)
