@@ -13,12 +13,8 @@ class MpesaClient:
         self.base_url = "https://sandbox.safaricom.co.ke"
 
     def generate_access_token(self):
-
         authentication_url = f"{self.base_url}/oauth/v1/generate?grant_type=client_credentials"
         response = requests.get(authentication_url, auth=HTTPBasicAuth(self.consumer_key, self.consumer_secret))
-        print("Status Code:", response.status_code)
-        print("Response Text:", response.text)
-
         response.raise_for_status()
         self.access_token = response.json().get("access_token")
 
@@ -40,7 +36,5 @@ class MpesaClient:
         }
         print("Sending registration payload:", body)
         response = requests.post(url, json=body, headers=headers)
-        print("Mpesa Response ::", response)
-        print("Response Text ::", response.text)
         response.raise_for_status()
         return response.json

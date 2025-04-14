@@ -1,7 +1,5 @@
-from fastapi import FastAPI
+import uvicorn
+from api.routes import app
 
-app = FastAPI()
-
-@app.get("/")
-async def root():
-    return {"message": "Hello Africa"}
+if __name__ == "__main__":
+    app.run(debug=True)
