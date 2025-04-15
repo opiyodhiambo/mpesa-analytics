@@ -16,9 +16,11 @@ class TransactionTransformer:
         self.port = int(os.getenv("DATABASE_PORT", 5432))
         self.db_engine = self._create_engine()
 
+
     def parse_time(self, df: DataFrame) -> DataFrame:
         df['transaction_time'] = pd.to_datetime(df['transaction_time'], format='%Y%m%d%H%M%S')
         return df
+
 
     async def get_repeat_customers(self, df: pd.DataFrame) -> pd.DataFrame:
         now = pd.Timestamp.now()
@@ -48,23 +50,55 @@ class TransactionTransformer:
 
         return updated_customers
 
+
     def cluster_customers_fcm(self, df: DataFrame) -> DataFrame:
         return df
+
 
     def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
         return df
 
+
     def get_peak_activity(self, df: DataFrame) -> DataFrame:
-        return df
+        # Extracting hour and day of week
+        df['hour'] = df['transaction_time'].dt.hour + 1
+        df['day_of_week'] = df['transaction_time'].dt.day_name()
+
+        # Creating a new pivot table from the current batch
+        new_pivot_table = df.pivot_table(
+            index='day_of_week',
+            columns='hour',
+            values='transaction_id',
+            aggfunc='count',
+            fill_value=0
+        )
+
+        # Loading existing pivor table from the database
+        with self.db_engine.connect as conn:
+            existing_pivot_table = pd.read_sql_table('peak_activity', conn, index_col='day_of_week')
+
+        # Combining the two pivot tables through unioned indexing
+        all_index = existing_pivot_table.index.union(new_pivot_table.index)
+        all_columns = existing_pivot_table.columns.union(new_pivot_table.columns)
+
+        existing_pivot_table = existing_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
+        new_pivot_table = new_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
+        combined_pivot_table = existing_pivot_table.add(new_pivot_table, fill_value=0).astype(int)
+
+        return combined_pivot_table
+
 
     def get_total_transactions(self, df: DataFrame) -> int:
         return len(df)    
 
+
     def compute_transaction_volume(self, df: DataFrame) -> float:
         return df['transaction_amount'].sum() 
 
+
     def compute_weekly_trends(self, df: DataFrame) -> DataFrame:
         return df
+
 
     def _update_cummulative_metrics(self, df: DataFrame) -> DataFrame:
         # Updating cumulative metrics
