@@ -8,7 +8,7 @@ class ETLCoordinator:
         self.transformer = TransactionTransformer()
         self.loader = TransactionLoader()
 
-    def run(self):
+    async def run(self):
         raw_data = self.extractor.extract()
-        transformed_data = self.transformer.transform(raw_data)
+        transformed_data = await self.transformer.transform(raw_data)
         self.loader.load(transformed_data)
