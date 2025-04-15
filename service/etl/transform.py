@@ -1,9 +1,16 @@
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import asyncio
 from pandas import DataFrame
 import numpy as np
 import pandas as pd
+import logging
+import os
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 class TransactionTransformer:
     def __init__(self):
@@ -30,8 +37,12 @@ class TransactionTransformer:
         return df['transaction_amount'].sum() 
 
 
-    async def get_repeat_customers(self, df: pd.DataFrame) -> pd.DataFrame:
-        now = pd.Timestamp.now()
+    def get_repeat_customers(self, df: pd.DataFrame) -> pd.DataFrame:
+         # Ensure transaction_amount is numeric
+        df['transaction_amount'] = pd.to_numeric(df['transaction_amount'], errors='coerce')
+
+        # Drop rows with missing msisdn or transaction_amount
+        df = df.dropna(subset=['msisdn', 'transaction_amount'])
 
         # New metrics from the incoming batch
         new_grouped = df.groupby('msisdn').agg(
@@ -44,18 +55,19 @@ class TransactionTransformer:
         msisdns = new_grouped['msisdn'].tolist()
 
         # Existing customer records from the DB
-        # Offloading it to a background thread so it doesn't block your event loop
-        existing_df = await asyncio.to_thread(self._fetch_existing_customers, msisdns) 
+        existing_df = self._fetch_existing_customers(msisdns) 
 
         if existing_df.empty:
-            return pd.DataFrame()  # No repeat customers found
+            logging.info("No existing customers found — persisting all as new.")
+            self._persist_customers(new_grouped)  
+            return new_grouped
 
         # Merging with new data
         merged_df = pd.merge(existing_df, new_grouped, on='msisdn', suffixes=('_old', '_new'))
 
         # updating cummulative data
         updated_customers = self._update_cummulative_metrics(merged_df)
-
+        logging.info(f"updated_customers: {updated_customers}")
         return updated_customers
 
 
@@ -74,7 +86,7 @@ class TransactionTransformer:
         )
 
         # Loading existing pivor table from the database
-        with self.db_engine.connect as conn:
+        with self.db_engine.connect() as conn:
             existing_pivot_table = pd.read_sql_table('peak_hours', conn, index_col='day_of_week')
 
         # Combining the two pivot tables through unioned indexing
@@ -84,28 +96,33 @@ class TransactionTransformer:
         existing_pivot_table = existing_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
         new_pivot_table = new_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
         combined_pivot_table = existing_pivot_table.add(new_pivot_table, fill_value=0).astype(int)
-
+        logging.info(f"combined_pivot_table: {combined_pivot_table}")
         return combined_pivot_table
 
 
     async def compute_timeseries(self, df: DataFrame) -> dict[str, DataFrame]:
-        daily_task = asyncio.to_thread(self._get_timeseries_trends(df, 'D'))
-        weekly_task = asyncio.to_thread(self.get_timeseries_trends, df, 'W')
-        monthly_task = asyncio.to_thread(self.get_timeseries_trends, df, 'M')
+        logging.info(f"Computing time series")
+        daily_task = asyncio.to_thread(self._get_timeseries_trends, df, 'D')
+        weekly_task = asyncio.to_thread(self._get_timeseries_trends, df, 'W')
+        monthly_task = asyncio.to_thread(self._get_timeseries_trends, df, 'M')
 
         daily, weekly, monthly = await asyncio.gather(daily_task, weekly_task, monthly_task)
 
-        return {
+        timeseries_result =  {
             'daily': daily,
             'weekly': weekly,
             'monthly': monthly,
         }
+        logging.info(f"timeseries_result: {timeseries_result}")
+        return timeseries_result
+    
 
     def _update_cummulative_metrics(self, df: DataFrame) -> DataFrame:
+        now = pd.Timestamp.now()
         # Updating cumulative metrics
-        df['total_transactions'] = df['total_transactions_old'] + merged['total_transactions_new']
-        df['total_spend'] = df['total_spend_old'] + merged['total_spend_new']
-        df['avg_spend'] = df['total_spend'] / merged['total_transactions']
+        df['total_transactions'] = df['total_transactions_old'] + df['total_transactions_new']
+        df['total_spend'] = df['total_spend_old'] + df['total_spend_new']
+        df['avg_spend'] = df['total_spend'] / df['total_transactions']
         df['last_seen'] = df[['last_seen_old', 'last_seen_new']].max(axis=1)
 
         # Recomputing churn and loyalty
@@ -138,7 +155,7 @@ class TransactionTransformer:
         return df
 
 
-    def _get_timeseries_trends(df: DataFrame, freq: str) -> DataFrame:
+    def _get_timeseries_trends(self, df: DataFrame, freq: str) -> DataFrame:
         """
         Here, we timeseries trends grouped by a given frequency.
         
@@ -165,6 +182,101 @@ class TransactionTransformer:
         })
 
         return trends.reset_index()
+
+
+    def _persist_customers(self, df: pd.DataFrame):
+        try:
+            # Check if the dataframe is empty
+            if df.empty:
+                logging.info("No customers to persist.")
+                return
+
+            df = self._update_cummulative_metrics(df)
+
+            # Iterate through the DataFrame to either insert or update customers
+            with self.db_engine.connect() as conn:
+                for index, row in df.iterrows():
+                    msisdn = row['msisdn']
+                    total_transactions = row['total_transactions']
+                    total_spend = row['total_spend']
+                    avg_spend = row['avg_spend']
+                    last_seen = row['last_seen']
+                    days_since_last = row['days_since_last']
+                    is_churned = row['is_churned']
+                    churn_score = row['churn_score']
+                    loyalty_score = row['loyalty_score']
+                    
+                    # Checking if the msisdn exists in the database
+                    existing_customer_query = text("""
+                        SELECT COUNT(*) FROM customers WHERE msisdn = :msisdn
+                    """)
+                    result = conn.execute(existing_customer_query, {"msisdn": msisdn}).scalar()
+
+                    if result > 0:
+                        # If customer exists, update the record
+                        update_query = text("""
+                            UPDATE customers
+                            SET total_transactions = :total_transactions,
+                                total_spend = :total_spend,
+                                avg_spend = :avg_spend,
+                                last_seen = :last_seen,
+                                days_since_last = :days_since_last
+                                is_churned = :is_churned
+                                churn_score = :churn_score
+                                loyalty_score = :loyalty_score
+                            WHERE msisdn = :msisdn
+                        """)
+
+                        logging.info(f"customer exists, update query {update_query}")
+                        conn.execute(update_query, {
+                            "msisdn": msisdn,
+                            "total_transactions": total_transactions,
+                            "total_spend": total_spend,
+                            "avg_spend": avg_spend,
+                            "last_seen": last_seen,
+                            "days_since_last": days_since_last,
+                            "is_churned": is_churned,
+                            "churn_score": churn_score,
+                            "loyalty_score": loyalty_score
+                        })
+                    else:
+                        # If customer doesn't exist, insert new record
+                        insert_query = text("""
+                            INSERT INTO customers (
+                                msisdn, 
+                                total_transactions, 
+                                total_spend, 
+                                avg_spend, 
+                                last_seen, 
+                                days_since_last,
+                                is_churned,
+                                churn_score,
+                                loyalty_score
+                            )
+                            VALUES (:msisdn, :total_transactions, :total_spend, :avg_spend, :last_seen, :days_since_last, :is_churned, :churn_score, :loyalty_score)
+                        """)
+
+                        conn.execute(insert_query, {
+                            "msisdn": msisdn,
+                            "total_transactions": total_transactions,
+                            "total_spend": total_spend,
+                            "avg_spend": avg_spend,
+                            "last_seen": last_seen,
+                            "days_since_last": days_since_last,
+                            "is_churned": is_churned,
+                            "churn_score": churn_score,
+                            "loyalty_score": loyalty_score
+                        })
+                conn.commit()
+
+            logging.info("Customer data persisted successfully.")
+
+        except Exception as e:
+            logging.error(f"Error while persisting customer data: {e}")
+            raise
+
+
+
         
 
     def _fetch_existing_customers(self, msisdns):

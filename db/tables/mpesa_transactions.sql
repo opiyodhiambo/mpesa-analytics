@@ -1,4 +1,4 @@
-CREATE TABLE mpesa_transactions (
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
     id SERIAL PRIMARY KEY,
     transaction_type TEXT,
     transaction_id TEXT UNIQUE,

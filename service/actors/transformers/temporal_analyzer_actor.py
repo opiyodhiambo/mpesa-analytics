@@ -2,6 +2,7 @@ import logging
 import pykka
 from service.models.commands import Command
 from service.etl.transform import TransactionTransformer
+import asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,7 +27,15 @@ class TemporalAnalyzerActor(pykka.ThreadingActor):
 
         try:
             if command == Command.COMPUTE_TIMESERIES:
-                return self.transaction_transformer.compute_timeseries(data)
+                # Handle this async call inside sync context
+                event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(event_loop)
+
+                result = event_loop.run_until_complete(
+                    self.transaction_transformer.compute_timeseries(data)
+                )
+                event_loop.close()
+                return result
             elif command == Command.GET_ACTIVITY_HEATMAP:
                 return self.transaction_transformer.get_peak_hours(data)
             else:
