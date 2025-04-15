@@ -10,6 +10,6 @@ class Command(Enum):
     COMPUTE_TRANSACTION_VOLUME = "compute_transaction_volume"
     GET_TOTAL_TRANSACTIONS = "get_total_transactions"
     CLUSTER_CUSTOMERS_FCM = "cluster_customers_fcm"
-    COMPUTE_WEEKLY_TRENDS = "compute_weekly_trends"
+    COMPUTE_TIMESERIES = "compute_timeseries"
     GET_ACTIVITY_HEATMAP = "get_transaction_heatmap"
 

@@ -22,6 +22,14 @@ class TransactionTransformer:
         return df
 
 
+    def get_total_transactions(self, df: DataFrame) -> int:
+        return len(df)    
+
+
+    def compute_transaction_volume(self, df: DataFrame) -> float:
+        return df['transaction_amount'].sum() 
+
+
     async def get_repeat_customers(self, df: pd.DataFrame) -> pd.DataFrame:
         now = pd.Timestamp.now()
 
@@ -51,15 +59,7 @@ class TransactionTransformer:
         return updated_customers
 
 
-    def cluster_customers_fcm(self, df: DataFrame) -> DataFrame:
-        return df
-
-
-    def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
-        return df
-
-
-    def get_peak_activity(self, df: DataFrame) -> DataFrame:
+    def get_peak_hours(self, df: DataFrame) -> DataFrame:
         # Extracting hour and day of week
         df['hour'] = df['transaction_time'].dt.hour + 1
         df['day_of_week'] = df['transaction_time'].dt.day_name()
@@ -75,7 +75,7 @@ class TransactionTransformer:
 
         # Loading existing pivor table from the database
         with self.db_engine.connect as conn:
-            existing_pivot_table = pd.read_sql_table('peak_activity', conn, index_col='day_of_week')
+            existing_pivot_table = pd.read_sql_table('peak_hours', conn, index_col='day_of_week')
 
         # Combining the two pivot tables through unioned indexing
         all_index = existing_pivot_table.index.union(new_pivot_table.index)
@@ -88,17 +88,18 @@ class TransactionTransformer:
         return combined_pivot_table
 
 
-    def get_total_transactions(self, df: DataFrame) -> int:
-        return len(df)    
+    async def compute_timeseries(self, df: DataFrame) -> dict[str, DataFrame]:
+        daily_task = asyncio.to_thread(self._get_timeseries_trends(df, 'D'))
+        weekly_task = asyncio.to_thread(self.get_timeseries_trends, df, 'W')
+        monthly_task = asyncio.to_thread(self.get_timeseries_trends, df, 'M')
 
+        daily, weekly, monthly = await asyncio.gather(daily_task, weekly_task, monthly_task)
 
-    def compute_transaction_volume(self, df: DataFrame) -> float:
-        return df['transaction_amount'].sum() 
-
-
-    def compute_weekly_trends(self, df: DataFrame) -> DataFrame:
-        return df
-
+        return {
+            'daily': daily,
+            'weekly': weekly,
+            'monthly': monthly,
+        }
 
     def _update_cummulative_metrics(self, df: DataFrame) -> DataFrame:
         # Updating cumulative metrics
@@ -107,7 +108,7 @@ class TransactionTransformer:
         df['avg_spend'] = df['total_spend'] / merged['total_transactions']
         df['last_seen'] = df[['last_seen_old', 'last_seen_new']].max(axis=1)
 
-        # Recompute churn and loyalty
+        # Recomputing churn and loyalty
         df['days_since_last'] = (now - df['last_seen']).dt.days
         df['is_churned'] = df['days_since_last'] > 30
         df['churn_score'] = df['days_since_last'] / 60.0
@@ -127,6 +128,43 @@ class TransactionTransformer:
         ]].copy()
 
         return updated_customers.sort_values(by='loyalty_score', ascending=False)
+
+
+    def cluster_customers_fcm(self, df: DataFrame) -> DataFrame:
+        return df
+
+
+    def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
+        return df
+
+
+    def _get_timeseries_trends(df: DataFrame, freq: str) -> DataFrame:
+        """
+        Here, we timeseries trends grouped by a given frequency.
+        
+        Args:
+            df: DataFrame with 'transaction_time' and 'transaction_amount'.
+            freq: Resampling frequency - 'D' (day), 'W' (week), 'M' (month)
+            
+        Returns:
+            DataFrame with date index and aggregated metrics.
+        """
+        df = df.copy()
+        df['transaction_time'] = pd.to_datetime(df.get('transaction_time', pd.Timestamp.now()))
+        df['transaction_amount'] = df.get('transaction_amount', 0)
+        df['transaction_id'] = df.get('transaction_id', range(len(df)))
+        df['transaction_time'] = pd.to_datetime(df['transaction_time'])
+        df.set_index('transaction_time', inplace=True)
+
+        trends = df.resample(freq).agg({
+            'transaction_id': 'count',
+            'transaction_amount': 'sum'
+        }).rename(columns={
+            'transaction_id': 'total_transactions',
+            'transaction_amount': 'total_amount'
+        })
+
+        return trends.reset_index()
         
 
     def _fetch_existing_customers(self, msisdns):
