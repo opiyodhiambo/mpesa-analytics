@@ -1,20 +1,27 @@
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import asyncio
 from pandas import DataFrame
+
+from .utils.summary_calculator import calculate_summary
+from .utils.clv_predictor import predict_customer_lifetime_value
+from .utils.customer_analyser import cluster_customers_fcm, identify_repeat_customers
+from .utils.weekly_trend_calculator import compute_weekly_timeseries
+from .utils.peak_activity_getter import get_peak_activity
 
 class TransactionTransformer:
     def __init__(self):
         self.process_pool = ProcessPoolExecutor()
+        self.thread_pool = ThreadPoolExecutor()
 
-    async def transform(self, df: DataFrame) -> Dict[str, pd.DataFrame]:
+    async def transform(self, df: DataFrame) -> dict[str, DataFrame]:
         df = self._parse_time(df)
         
-        repeat_customer_task = _run_in_thread(self, self._identify_repeat_customers, df)
-        summary_task = _run_in_process(self, self.calculate_summary, df)
-        clv_task = _run_in_process(self, self.predict_customer_lifetime_value, df)
-        clusters_task = _run_in_process(self, self.cluster_customers_fcm, df)
-        weekly_trends_task = _run_in_process(self, self.compute_weekly_timeseries, df)
-        heatmap_task = _run_in_process(self, self.get_peak_activity, df)
+        repeat_customer_task = self._run_in_thread(identify_repeat_customers, df)
+        summary_task = self._run_in_process(calculate_summary, df)
+        clv_task = self._run_in_process(predict_customer_lifetime_value, df)
+        clusters_task = self._run_in_process(cluster_customers_fcm, df)
+        weekly_trends_task = self._run_in_process(compute_weekly_timeseries, df)
+        heatmap_task = self._run_in_process(get_peak_activity, df)
 
         (
             repeat_customer,
@@ -43,26 +50,7 @@ class TransactionTransformer:
 
 
     def _parse_time(self, df: DataFrame) -> DataFrame:
-        pass
-
-    def _identify_repeat_customers(self, df: DataFrame) -> DataFrame:
-        pass
-
-    def calculate_summary(self, df: DataFrame) -> DataFrame:
-        pass
-
-    def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
-        pass
-
-    def cluster_customers_fcm(self, df: DataFrame) -> DataFrame:
-        pass
-
-    def compute_weekly_timeseries(self, df: DataFrame) -> DataFrame:
-        pass
-
-    def get_peak_activity(self, df: DataFrame) -> DataFrame:
-        pass
-
+        return df
 
     # For process heavy workloads
     async def _run_in_process(self, func, *args):
@@ -72,7 +60,7 @@ class TransactionTransformer:
     # For Thread heavy workloads
     async def _run_in_thread(self, func, *args):
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, func, *args)
+        return await loop.run_in_executor(self.thread_pool, func, *args)
 
     def close(self):
         self.process_pool.shutdown()
