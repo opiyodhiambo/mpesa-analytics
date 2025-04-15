@@ -18,17 +18,21 @@ class CoordinatorActor(pykka.ThreadingActor):
         self.loader_actor = LoaderActor.start()
 
     def on_receive(self, message):
-        logging.info(f"received message :: {message}")
+        logging.info(f"received message :: {message['command']}")
         try:
             if message.get("command") == Command.RUN_BATCH:
                 raw_data = self.transaction_extractor.extract()
-                logging.info(f"Coordinator extracted raw data: {raw_data.shape}")
+                
+                logging.info(f"Coordinator extracted raw data")
+                logging.info(f"sending raw data to: {self.transformer_actor}")
 
                 transformed_data = self.transformer_actor.ask({
                     "command": Command.TRANSFORM,
                     "data": raw_data
                 })
-                logging.info(f"Coordinator received transformed data: {transformed_data}")
+
+                logging.info(f"Coordinator received transformed data from {self.transformer_actor}")
+                logging.info(f"sending transformed data to: {self.loader_actor}")
 
                 result = self.loader_actor.ask({
                     "command": Command.LOAD,

@@ -15,7 +15,7 @@ class TransformerActor(pykka.ThreadingActor):
         self.transaction_transformer = TransactionTransformer()
 
     def on_receive(self, message):
-        logging.info(f"received message :: {message}")
+        logging.info(f"received message :: {message['command']}")
         if message.get("command") == Command.TRANSFORM:
             raw_data = message["data"]
 
