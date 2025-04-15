@@ -22,4 +22,4 @@ class TransactionLoader:
         )
 
     def load(self, df: DataFrame):
-        pass
+        return df
