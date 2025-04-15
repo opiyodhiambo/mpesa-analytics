@@ -14,7 +14,7 @@ class TransactionTransformer:
         self.thread_pool = ThreadPoolExecutor()
 
     async def transform(self, df: DataFrame) -> dict[str, DataFrame]:
-        df = self._parse_time(df)
+        return self._parse_time(df)
         
         repeat_customer_task = self._run_in_thread(identify_repeat_customers, df)
         summary_task = self._run_in_process(calculate_summary, df)
@@ -48,8 +48,25 @@ class TransactionTransformer:
             "heatmap": heatmap
         }
 
+    def parse_time(self, df: DataFrame) -> DataFrame:
+        return df
 
-    def _parse_time(self, df: DataFrame) -> DataFrame:
+    def identify_repeat_customers(df: DataFrame) -> DataFrame:
+        return df
+
+    def cluster_customers_fcm(df: DataFrame) -> DataFrame:
+        return df
+
+    def predict_customer_lifetime_value(df: DataFrame) -> DataFrame:
+        return df
+
+    def get_peak_activity(df: DataFrame) -> DataFrame:
+        return df
+
+    def calculate_summary(df: DataFrame) -> DataFrame:
+        return df   
+
+    def compute_weekly_timeseries(df: DataFrame) -> DataFrame:
         return df
 
     # For process heavy workloads
