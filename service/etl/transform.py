@@ -13,45 +13,10 @@ class TransactionTransformer:
         self.process_pool = ProcessPoolExecutor()
         self.thread_pool = ThreadPoolExecutor()
 
-    async def transform(self, df: DataFrame) -> dict[str, DataFrame]:
-        return self._parse_time(df)
-        
-        repeat_customer_task = self._run_in_thread(identify_repeat_customers, df)
-        summary_task = self._run_in_process(calculate_summary, df)
-        clv_task = self._run_in_process(predict_customer_lifetime_value, df)
-        clusters_task = self._run_in_process(cluster_customers_fcm, df)
-        weekly_trends_task = self._run_in_process(compute_weekly_timeseries, df)
-        heatmap_task = self._run_in_process(get_peak_activity, df)
-
-        (
-            repeat_customer,
-            summary,
-            clv,
-            clusters,
-            weekly_trends,
-            heatmap
-        ) = await asyncio.gather(
-            repeat_customer_task,
-            summary_task,
-            clv_task,
-            clusters_task,
-            weekly_trends_task,
-            heatmap_task
-        )
-
-        return {
-            "repeat_customers": repeat_customer,
-            "summary": summary,
-            "cltv": clv,
-            "clusters": clusters,
-            "weekly_trend": weekly_trends,
-            "heatmap": heatmap
-        }
-
     def parse_time(self, df: DataFrame) -> DataFrame:
         return df
 
-    def identify_repeat_customers(df: DataFrame) -> DataFrame:
+    def get_repeat_customers(df: DataFrame) -> DataFrame:
         return df
 
     def cluster_customers_fcm(df: DataFrame) -> DataFrame:
@@ -63,10 +28,13 @@ class TransactionTransformer:
     def get_peak_activity(df: DataFrame) -> DataFrame:
         return df
 
-    def calculate_summary(df: DataFrame) -> DataFrame:
+    def get_total_transactions(df: DataFrame) -> DataFrame:
         return df   
 
-    def compute_weekly_timeseries(df: DataFrame) -> DataFrame:
+    def compute_transaction_volume(df: DataFrame) -> DataFrame:
+        return df 
+
+    def compute_weekly_trends(df: DataFrame) -> DataFrame:
         return df
 
     # For process heavy workloads

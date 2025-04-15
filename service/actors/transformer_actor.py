@@ -24,7 +24,7 @@ class TransformerActor(pykka.ThreadingActor):
         self.customer_analyser_actor = CustomerAnalyserActor.start()
 
     def on_receive(self, message):
-        logging.info(f"received message :: {message['command']}")
+        logging.info(f"TransformerActor received command :: {message['command']}")
         try:
             if message.get("command") == Command.TRANSFORM:
                 raw_data = message["data"]
@@ -43,6 +43,7 @@ class TransformerActor(pykka.ThreadingActor):
 
                 return {
                     "total_transactions": total_transactions,
+                    "transaction_volume": transaction_volume,
                     "repeat_customers": repeat_customers,
                     "cltv": clv,
                     "clusters": clusters,

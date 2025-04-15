@@ -5,7 +5,7 @@ class Command(Enum):
     TRANSFORM = "transform"
     LOAD = "load"
 
-    COMPUTE_CLTV = "compute_customer_lifetime_value"
+    COMPUTE_CLTV = "predict_customer_lifetime_value"
     GET_REPEAT_CUSTOMERS = "get_repeat_customers"
     COMPUTE_TRANSACTION_VOLUME = "compute_transaction_volume"
     GET_TOTAL_TRANSACTIONS = "get_total_transactions"
