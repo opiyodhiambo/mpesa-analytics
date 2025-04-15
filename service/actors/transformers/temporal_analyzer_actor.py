@@ -24,10 +24,16 @@ class TemporalAnalyzerActor(pykka.ThreadingActor):
 
         logging.info(f"TemporalAnalyzerActor received command: {command}")
 
-        if command == Command.COMPUTE_WEEKLY_TRENDS:
-            return self.transaction_transformer.compute_weekly_trends(data)
-        elif command == Command.GET_ACTIVITY_HEATMAP:
-            return self.transaction_transformer.get_peak_activity(data)
-        else:
-            logging.warning(f"Unknown command received: {command}")
-            return None
+        try:
+            if command == Command.COMPUTE_WEEKLY_TRENDS:
+                return self.transaction_transformer.compute_weekly_trends(data)
+            elif command == Command.GET_ACTIVITY_HEATMAP:
+                return self.transaction_transformer.get_peak_activity(data)
+            else:
+                logging.warning(f"Unknown command received: {command}")
+                return None
+        except Exception as e:
+            logging.error(f"Error in on_receive: {e}", exc_info=True)
+            return {"error": str(e)}
+
+       

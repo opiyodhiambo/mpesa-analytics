@@ -24,10 +24,14 @@ class SummaryCalculatorActor(pykka.ThreadingActor):
 
         logging.info(f"SummaryCalculatorActor received command: {command}")
 
-        if command == Command.GET_TOTAL_TRANSACTIONS:
-            return self.transaction_transformer.get_total_transactions(data)
-        elif command == Command.COMPUTE_TRANSACTION_VOLUME:
-            return self.transaction_transformer.compute_transaction_volume(data)
-        else:
-            logging.warning(f"Unknown command received: {command}")
-            return None
+        try:
+            if command == Command.GET_TOTAL_TRANSACTIONS:
+                return self.transaction_transformer.get_total_transactions(data)
+            elif command == Command.COMPUTE_TRANSACTION_VOLUME:
+                return self.transaction_transformer.compute_transaction_volume(data)
+            else:
+                logging.warning(f"Unknown command received: {command}")
+                return None
+        except Exception as e:
+            logging.error(f"Error in on_receive: {e}", exc_info=True)
+            return {"error": str(e)}

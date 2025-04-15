@@ -24,13 +24,18 @@ class CustomerAnalyserActor(pykka.ThreadingActor):
         data = message.get("data")
 
         logging.info(f"CustomerAnalyserActor received command: {command}")
+        try:
+            if command == Command.GET_REPEAT_CUSTOMERS:
+                return self.transaction_transformer.get_repeat_customers(data)
+            elif command == Command.COMPUTE_CLTV:
+                return self.transaction_transformer.predict_customer_lifetime_value(data)
+            elif command == Command.CLUSTER_CUSTOMERS_FCM:
+                return self.transaction_transformer.cluster_customers_fcm(data)
+            else:
+                logging.warning(f"Unknown command received: {command}")
+                return None
+        except Exception as e:
+            logging.error(f"Error in on_receive: {e}", exc_info=True)
+            return {"error": str(e)}
 
-        if command == Command.GET_REPEAT_CUSTOMERS:
-            return self.transaction_transformer.get_repeat_customers(data)
-        elif command == Command.COMPUTE_CLTV:
-            return self.transaction_transformer.predict_customer_lifetime_value(data)
-        elif command == Command.CLUSTER_CUSTOMERS_FCM:
-            return self.transaction_transformer.cluster_customers_fcm(data)
-        else:
-            logging.warning(f"Unknown command received: {command}")
-            return None
+        

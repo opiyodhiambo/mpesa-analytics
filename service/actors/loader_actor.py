@@ -15,8 +15,13 @@ class LoaderActor(pykka.ThreadingActor):
         self.transaction_loader = TransactionLoader()
 
     def on_receive(self, message):
-        logging.info(f"received message :: {message['command']}")
-        if message.get("command") == Command.LOAD:
-            transformed_data = message["data"]
-            return self.transaction_loader.load(transformed_data)
+        logging.info(f"LoaderActor received command: {message['command']}")
+
+        try:
+            if message.get("command") == Command.LOAD:
+                transformed_data = message["data"]
+                return self.transaction_loader.load(transformed_data)
+        except Exception as e:
+            logging.error(f"Error in on_receive: {e}", exc_info=True)
+            return {"error": str(e)}
             

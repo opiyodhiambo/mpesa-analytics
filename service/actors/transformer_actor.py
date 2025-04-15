@@ -4,6 +4,9 @@ import asyncio
 from service.etl.transform import TransactionTransformer
 from service.models.commands import Command
 
+import os
+import pandas as pd
+
 from .transformers.temporal_analyzer_actor import TemporalAnalyzerActor
 from .transformers.summary_calculator_actor import SummaryCalculatorActor
 from .transformers.customer_analyser_actor import CustomerAnalyserActor
@@ -32,6 +35,12 @@ class TransformerActor(pykka.ThreadingActor):
                 # Parse time
                 parsed_data = self.transaction_transformer.parse_time(raw_data)
 
+                # # Save to CSV for exploration
+                # output_path = os.path.join("exploration", "parsed_transactions.csv")
+                # os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                # parsed_data.to_csv(output_path, index=False)
+                # logging.info(f"Saved parsed data to {output_path}")
+
                 # Sending messages to child actors
                 total_transactions = self.summary_calculator_actor.ask({"command": Command.GET_TOTAL_TRANSACTIONS, "data": parsed_data})
                 transaction_volume = self.summary_calculator_actor.ask({"command": Command.COMPUTE_TRANSACTION_VOLUME, "data": parsed_data})
@@ -45,7 +54,7 @@ class TransformerActor(pykka.ThreadingActor):
                     "total_transactions": total_transactions,
                     "transaction_volume": transaction_volume,
                     "repeat_customers": repeat_customers,
-                    "cltv": clv,
+                    "cltv": cltv,
                     "clusters": clusters,
                     "weekly_trend": weekly_trends,
                     "activity_heatmap": activity_heatmap
