@@ -14,6 +14,8 @@ class CoordinatorActor(pykka.ThreadingActor):
     def __init__(self):
         super().__init__()
         self.transaction_extractor = TransactionExtractor()
+
+        logging.info("CoordinatorActor Spawing child actors ")
         self.transformer_actor = TransformerActor.start()
         self.loader_actor = LoaderActor.start()
 
@@ -25,7 +27,7 @@ class CoordinatorActor(pykka.ThreadingActor):
                 # Extracting data 
                 raw_data = self.transaction_extractor.extract()
 
-                # Sending messages to child actors
+                logging.info("CoordinatorActor Sending messages to child actors")
                 transformed_data = self.transformer_actor.ask({"command": Command.TRANSFORM, "data": raw_data})
                 result = self.loader_actor.ask({"command": Command.LOAD, "data": transformed_data})
         

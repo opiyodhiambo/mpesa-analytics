@@ -21,7 +21,7 @@ class TransformerActor(pykka.ThreadingActor):
         super().__init__()
         self.transaction_transformer = TransactionTransformer()
 
-        # Spawing child actors 
+        logging.info("TransformerActor Spawing child actors ")
         self.temporal_analyzer_actor = TemporalAnalyzerActor.start()
         self.summary_calculator_actor = SummaryCalculatorActor.start()
         self.customer_analyser_actor = CustomerAnalyserActor.start()
@@ -35,27 +35,19 @@ class TransformerActor(pykka.ThreadingActor):
                 # Parse time
                 parsed_data = self.transaction_transformer.parse_time(raw_data)
 
-                # # Save to CSV for exploration
-                # output_path = os.path.join("exploration", "parsed_transactions.csv")
-                # os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                # parsed_data.to_csv(output_path, index=False)
-                # logging.info(f"Saved parsed data to {output_path}")
-
-                # Sending messages to child actors
+                logging.info("TransformerActor Sending messages to child actors")
                 total_transactions = self.summary_calculator_actor.ask({"command": Command.GET_TOTAL_TRANSACTIONS, "data": parsed_data})
                 transaction_volume = self.summary_calculator_actor.ask({"command": Command.COMPUTE_TRANSACTION_VOLUME, "data": parsed_data})
                 repeat_customers = self.customer_analyser_actor.ask({"command": Command.GET_REPEAT_CUSTOMERS, "data": parsed_data})
                 cltv = self.customer_analyser_actor.ask({"command": Command.COMPUTE_CLTV, "data": repeat_customers})
-                clusters = self.customer_analyser_actor.ask({"command": Command.CLUSTER_CUSTOMERS_FCM, "data": cltv})
+                clustered_customers = self.customer_analyser_actor.ask({"command": Command.CLUSTER_CUSTOMERS_FCM, "data": cltv})
                 weekly_trends = self.temporal_analyzer_actor.ask({"command": Command.COMPUTE_TIMESERIES, "data": parsed_data})
                 activity_heatmap = self.temporal_analyzer_actor.ask({"command": Command.GET_ACTIVITY_HEATMAP, "data": parsed_data})
 
                 return {
                     "total_transactions": total_transactions,
                     "transaction_volume": transaction_volume,
-                    "repeat_customers": repeat_customers,
-                    "cltv": cltv,
-                    "clusters": clusters,
+                    "customers": clustered_customers,
                     "weekly_trend": weekly_trends,
                     "activity_heatmap": activity_heatmap
                 }

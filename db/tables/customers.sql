@@ -13,3 +13,5 @@ CREATE TABLE IF NOT EXISTS customers (
 
 -- ALTER TABLE customers
 -- ADD COLUMN first_seen TIMESTAMP NOT NULL DEFAULT NOW();
+
+-- remove dummy first seen from TransactionTransformer._update_cummulative_metrics, add it in the table

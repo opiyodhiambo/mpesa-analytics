@@ -26,23 +26,34 @@ class TransactionTransformer:
 
 
     def parse_time(self, df: DataFrame) -> DataFrame:
+        logging.info("Parsing time")
         df['transaction_time'] = pd.to_datetime(df['transaction_time'], format='%Y%m%d%H%M%S')
+
         return df
 
 
     def get_total_transactions(self, df: DataFrame) -> int:
+        logging.info("Computing total trasnactions")
+
         return len(df)    
 
 
     def compute_transaction_volume(self, df: DataFrame) -> float:
-        return df['transaction_amount'].sum() 
+        logging.info("Computing transaction volume")
+
+        df['transaction_amount'] = pd.to_numeric(df['transaction_amount'], errors='coerce')
+        df = df.dropna(subset=['transaction_amount'])
+
+        return round(df['transaction_amount'].sum(), 2)
+
+
 
 
     def get_repeat_customers(self, df: pd.DataFrame) -> pd.DataFrame:
-         # Ensure transaction_amount is numeric
-        df['transaction_amount'] = pd.to_numeric(df['transaction_amount'], errors='coerce')
+        logging.info("Updating customer metrics")
 
-        # Drop rows with missing msisdn or transaction_amount
+         # Ensuring transaction_amount is numeric
+        df['transaction_amount'] = pd.to_numeric(df['transaction_amount'], errors='coerce')
         df = df.dropna(subset=['msisdn', 'transaction_amount'])
 
         # New metrics from the incoming batch
@@ -53,9 +64,8 @@ class TransactionTransformer:
             last_seen=('transaction_time', 'max')
         ).reset_index()
 
-        msisdns = new_grouped['msisdn'].tolist()
-
         # Existing customer records from the DB
+        msisdns = new_grouped['msisdn'].tolist()
         existing_df = self._fetch_existing_customers(msisdns) 
 
         if existing_df.empty:
@@ -65,14 +75,13 @@ class TransactionTransformer:
 
         # Merging with new data
         merged_df = pd.merge(existing_df, new_grouped, on='msisdn', suffixes=('_old', '_new'))
-
-        # updating cummulative data
         updated_customers = self._update_cummulative_metrics(merged_df)
-        logging.info(f"updated_customers: {updated_customers}")
+
         return updated_customers
 
 
     def get_peak_hours(self, df: DataFrame) -> DataFrame:
+        logging.info("Getting peak hours")
         # Extracting hour and day of week
         df['hour'] = df['transaction_time'].dt.hour + 1
         df['day_of_week'] = df['transaction_time'].dt.day_name()
@@ -97,7 +106,7 @@ class TransactionTransformer:
         existing_pivot_table = existing_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
         new_pivot_table = new_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
         combined_pivot_table = existing_pivot_table.add(new_pivot_table, fill_value=0).astype(int)
-        logging.info(f"combined_pivot_table: {combined_pivot_table}")
+
         return combined_pivot_table
 
 
@@ -114,7 +123,7 @@ class TransactionTransformer:
             'weekly': weekly,
             'monthly': monthly,
         }
-        logging.info(f"timeseries_result: {timeseries_result}")
+    
         return timeseries_result
 
     
@@ -129,13 +138,14 @@ class TransactionTransformer:
         df['m_score'] = pd.qcut(df['avg_spend'].rank(method='first'), q=5, labels=[1, 2, 3, 4, 5]).astype(int)
 
         df['customer_segment'] = df.apply(self._assign_segment, axis=1)
-        logging.info(f"clustered_customers: {df}")
+    
         return df
 
 
     def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
+        logging.info("Calculating clv")
         df['clv'] = df.apply(self._calculate_clv, axis=1)
-        logging.info(f"df with clv: {df}")
+        
         return df
 
 
