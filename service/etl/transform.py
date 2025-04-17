@@ -115,6 +115,24 @@ class TransactionTransformer:
         }
         logging.info(f"timeseries_result: {timeseries_result}")
         return timeseries_result
+
+    
+    def cluster_customers_fcm(self, df: DataFrame) -> DataFrame:
+        logging.info(f"Clustering customers")
+
+        # Recency: lower days_since_last is better (recently active)
+        df['r_score'] = pd.qcut(df['days_since_last'], q=5, labels=[5, 4, 3, 2, 1]).astype(int)
+        # Frequency: higher total_transactions is better
+        df['f_score'] = pd.qcut(df['total_transactions'].rank(method='first'), q=5, labels=[1, 2, 3, 4, 5]).astype(int)
+        # Monetary: higher avg_spend is better
+        df['m_score'] = pd.qcut(df['avg_spend'].rank(method='first'), q=5, labels=[1, 2, 3, 4, 5]).astype(int)
+
+        df['customer_segment'] = df.apply(self._assign_segment, axis=1)
+        logging.info(f"clustered_customers: {df}")
+        return df
+
+    def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
+        return df
     
 
     def _update_cummulative_metrics(self, df: DataFrame) -> DataFrame:
@@ -146,13 +164,19 @@ class TransactionTransformer:
 
         return updated_customers.sort_values(by='loyalty_score', ascending=False)
 
-
-    def cluster_customers_fcm(self, df: DataFrame) -> DataFrame:
-        return df
-
-
-    def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
-        return df
+    def _assign_segment(self, row):
+        if row['r_score'] >= 4 and row['f_score'] >= 4 and row['m_score'] >= 4:
+            return 'Best Customers'
+        elif row['r_score'] >= 4 and row['f_score'] >= 4:
+            return 'Loyal Customers'
+        elif row['r_score'] >= 4 and row['f_score'] <= 2:
+            return 'Potential Loyalists'
+        elif row['r_score'] <= 2 and row['f_score'] <= 2 and row['m_score'] <= 2:
+            return 'Lost Customers'
+        elif row['r_score'] <= 2 and row['f_score'] <= 3:
+            return 'Churn Risk'
+        else:
+            return 'Other'
 
 
     def _get_timeseries_trends(self, df: DataFrame, freq: str) -> DataFrame:
