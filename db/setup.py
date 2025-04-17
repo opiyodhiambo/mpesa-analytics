@@ -16,7 +16,8 @@ def run_sql_scripts():
         os.path.join(base_dir, "tables", "mpesa_transactions.sql"),
         os.path.join(base_dir, "tables", "customers.sql"),
         os.path.join(base_dir, "tables", "peak_hours.sql"),
-        os.path.join(base_dir, "tables", "transaction_metrics.sql")
+        os.path.join(base_dir, "tables", "transaction_metrics.sql"),
+        os.path.join(base_dir, "tables", "timeseries_trends.sql")
     ]
 
     conn = psycopg2.connect(

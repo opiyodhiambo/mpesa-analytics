@@ -135,8 +135,35 @@ class TransactionLoader:
             conn.close()
 
 
-    def _update_trends(self, timeseries_trends: Dict[str, Any]):
+    def _update_trends(self, timeseries_trends: Dict[str, DataFrame]):
         logging.info("Updating time series trends")
+
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        for table_name, df in timeseries_trends.items():
+            for _, row in df.iterrows():
+                transaction_time = row["transaction_time"]
+                total_transactions = row["total_transactions"]
+                total_amount = row["total_amount"]
+
+                try:
+                    cursor.execute(f"""
+                        INSERT INTO {table_name} (transaction_time, total_transactions, total_amount)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (transaction_time) DO UPDATE SET
+                            total_transactions = EXCLUDED.total_transactions,
+                            total_amount = EXCLUDED.total_amount;
+                    """, (transaction_time, total_transactions, total_amount))
+                except Exception as e:
+                    logging.error(f"Failed to insert into {table_name}: {e}", exc_info=True)
+                    continue
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+
 
     def _update_heatmap(self, df: DataFrame):
         logging.info(f"Updating heat map table")
@@ -145,7 +172,7 @@ class TransactionLoader:
         cursor = conn.cursor()
 
         try:
-            for day_of_week, row in df.iterrows():
+            for day_of_week, row in df.iterrows():  
                 row_data = row.to_dict()
                 update_values = []
                 set_clauses = []

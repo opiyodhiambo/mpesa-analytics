@@ -112,9 +112,9 @@ class TransactionTransformer:
         daily, weekly, monthly = await asyncio.gather(daily_task, weekly_task, monthly_task)
 
         timeseries_result =  {
-            'daily': daily,
-            'weekly': weekly,
-            'monthly': monthly,
+            'daily_trends': daily,
+            'weekly_trends': weekly,
+            'monthly_trends': monthly,
         }
     
         return timeseries_result
