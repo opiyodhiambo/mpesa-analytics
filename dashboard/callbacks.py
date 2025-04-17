@@ -91,7 +91,11 @@ def register_callbacks(app):
                 index=days,
                 columns=hours,
                 fill_value=0
-            ).astype(int)
+            ).astype(float)
+
+              # Normalizing values to 0-1 range
+            if df.values.max() > 0:  # Only normalize if max > 0
+                df = (df - df.values.min()) / (df.values.max() - df.values.min())
             
             # Create heatmap figure
             fig = px.imshow(

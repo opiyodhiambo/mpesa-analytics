@@ -167,17 +167,6 @@ app.layout = html.Div(style={
         ])
     ]),
 
-    # # Scatter plot with square shape
-    # html.Div(children=[
-    #     html.H3("Customer Segments Distribution", style={'color': '#333'}),
-    #     dcc.Graph(
-    #         id="customer-segments-scatter",
-    #         style={'height': '500px', 'width': '100%'},
-    #         config={"displayModeBar": False}
-    #     )
-    # ]),
-
-
     # Trends
     html.Div(style={'marginBottom': '30px'}, children=[
         html.H3("Transaction Trends", style={'color': '#333'}),
@@ -198,15 +187,32 @@ app.layout = html.Div(style={
         )
     ]),
 
-   
-
-
-    # Intervals
-    dcc.Interval(id="metrics-interval", interval=2_000, n_intervals=1),
-    dcc.Interval(id="heatmap-interval", interval=5_000, n_intervals=0),
-    dcc.Interval(id="trends-interval", interval=5_000, n_intervals=0),
-    dcc.Interval(id="customers-interval", interval=5_000, n_intervals=0),
-    dcc.Interval(id="segments-interval", interval=5_000, n_intervals=0)
+    # Intervals with optimized refresh rates
+    dcc.Interval(
+        id="metrics-interval",
+        interval=60 * 1_000,  # 1 minute (60,000ms)
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id="heatmap-interval",
+        interval=60 * 60 * 1_000,  # 1 hour (3,600,000ms)
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id="trends-interval", 
+        interval=24 * 60 * 60 * 1_000,  # 1 day (86,400,000ms)
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id="customers-interval",
+        interval=7 * 24 * 60 * 60 * 1_000,  # 1 week (604,800,000ms)
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id="segments-interval",
+        interval=7 * 24 * 60 * 60 * 1_000,  # 1 week (604,800,000ms)
+        n_intervals=0
+    )
 ])
 
 
