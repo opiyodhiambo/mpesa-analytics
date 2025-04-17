@@ -20,7 +20,13 @@ class LoaderActor(pykka.ThreadingActor):
         try:
             if message.get("command") == Command.LOAD:
                 transformed_data = message["data"]
-                return self.transaction_loader.load(transformed_data)
+                event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(event_loop)
+                result = event_loop.run_until_complete(
+                    self.transaction_loader.load(transformed_data)
+                )
+                event_loop.close()
+                return result
         except Exception as e:
             logging.error(f"Error in on_receive: {e}", exc_info=True)
             return {"error": str(e)}

@@ -1,6 +1,5 @@
 import logging
 import pykka
-import asyncio
 from service.etl.transform import TransactionTransformer
 from service.models.commands import Command
 
@@ -41,14 +40,14 @@ class TransformerActor(pykka.ThreadingActor):
                 repeat_customers = self.customer_analyser_actor.ask({"command": Command.GET_REPEAT_CUSTOMERS, "data": parsed_data})
                 cltv = self.customer_analyser_actor.ask({"command": Command.COMPUTE_CLTV, "data": repeat_customers})
                 clustered_customers = self.customer_analyser_actor.ask({"command": Command.CLUSTER_CUSTOMERS_FCM, "data": cltv})
-                weekly_trends = self.temporal_analyzer_actor.ask({"command": Command.COMPUTE_TIMESERIES, "data": parsed_data})
+                timeseries_trends = self.temporal_analyzer_actor.ask({"command": Command.COMPUTE_TIMESERIES, "data": parsed_data})
                 activity_heatmap = self.temporal_analyzer_actor.ask({"command": Command.GET_ACTIVITY_HEATMAP, "data": parsed_data})
 
                 return {
                     "total_transactions": total_transactions,
                     "transaction_volume": transaction_volume,
                     "customers": clustered_customers,
-                    "weekly_trend": weekly_trends,
+                    "timeseries_trends": timeseries_trends,
                     "activity_heatmap": activity_heatmap
                 }
         except Exception as e:
