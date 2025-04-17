@@ -164,7 +164,6 @@ class TransactionLoader:
         conn.close()
 
 
-
     def _update_heatmap(self, df: DataFrame):
         logging.info(f"Updating heat map table")
         
