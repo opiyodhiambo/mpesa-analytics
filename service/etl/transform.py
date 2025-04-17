@@ -1,9 +1,10 @@
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from sqlalchemy import create_engine, text
 import asyncio
-from pandas import DataFrame
+from pandas import DataFrame, to_timedelta
 import numpy as np
 import pandas as pd
+from dateutil.relativedelta import relativedelta
 import logging
 import os
 
@@ -131,9 +132,28 @@ class TransactionTransformer:
         logging.info(f"clustered_customers: {df}")
         return df
 
+
     def predict_customer_lifetime_value(self, df: DataFrame) -> DataFrame:
+        df['clv'] = df.apply(self._calculate_clv, axis=1)
+        logging.info(f"df with clv: {df}")
         return df
-    
+
+
+    def _calculate_clv(self, row):
+        if row['first_seen'] > row['last_seen']:
+            return 0.0
+
+        delta = relativedelta(row['last_seen'], row['first_seen'])
+        months = delta.years * 12 + delta.months + (delta.days / 30.44)  # Partial month as a fraction
+        months_active = round(months, 2)
+
+        if months_active == 0:
+            return 0.0
+
+        frequency = row['total_transactions'] / months_active
+        clv = row['avg_spend'] * frequency * months_active
+
+        return clv
 
     def _update_cummulative_metrics(self, df: DataFrame) -> DataFrame:
         now = pd.Timestamp.now()
@@ -142,6 +162,9 @@ class TransactionTransformer:
         df['total_spend'] = df['total_spend_old'] + df['total_spend_new']
         df['avg_spend'] = df['total_spend'] / df['total_transactions']
         df['last_seen'] = df[['last_seen_old', 'last_seen_new']].max(axis=1)
+        df['first_seen'] = df['last_seen'] - to_timedelta(
+                np.random.randint(10, 181, size=len(df)), unit='D'
+            )
 
         # Recomputing churn and loyalty
         df['days_since_last'] = (now - df['last_seen']).dt.days
@@ -155,6 +178,7 @@ class TransactionTransformer:
             'total_transactions',
             'total_spend',
             'avg_spend',
+            'first_seen',
             'last_seen',
             'days_since_last',
             'is_churned',
@@ -224,6 +248,7 @@ class TransactionTransformer:
                     total_transactions = row['total_transactions']
                     total_spend = row['total_spend']
                     avg_spend = row['avg_spend']
+                    first_seen = row['first_seen']
                     last_seen = row['last_seen']
                     days_since_last = row['days_since_last']
                     is_churned = row['is_churned']
@@ -271,6 +296,7 @@ class TransactionTransformer:
                                 total_transactions, 
                                 total_spend, 
                                 avg_spend, 
+                                first_seen,
                                 last_seen, 
                                 days_since_last,
                                 is_churned,
@@ -286,6 +312,7 @@ class TransactionTransformer:
                             "total_spend": total_spend,
                             "avg_spend": avg_spend,
                             "last_seen": last_seen,
+                            "first_seen": last_seen,
                             "days_since_last": days_since_last,
                             "is_churned": is_churned,
                             "churn_score": churn_score,
@@ -300,12 +327,9 @@ class TransactionTransformer:
             raise
 
 
-
-        
-
     def _fetch_existing_customers(self, msisdns):
         query = text("""
-            SELECT msisdn, total_transactions, total_spend, avg_spend, last_seen,
+            SELECT msisdn, total_transactions, total_spend, avg_spend, first_seen, last_seen,
                 days_since_last, is_churned, churn_score, loyalty_score
             FROM customers
             WHERE msisdn = ANY(:msisdns)
@@ -317,17 +341,5 @@ class TransactionTransformer:
         db_url = f"postgresql+psycopg2://{self.user}:{self.password}@{self.host}:{self.port}/{self.dbname}"
         return create_engine(db_url)
 
-    # For process heavy workloads
-    async def _run_in_process(self, func, *args):
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self.process_pool, func, *args)
-
-    # For Thread heavy workloads
-    async def _run_in_thread(self, func, *args):
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self.thread_pool, func, *args)
-
-    def close(self):
-        self.process_pool.shutdown()
 
 

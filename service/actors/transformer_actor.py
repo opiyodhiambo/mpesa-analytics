@@ -45,8 +45,8 @@ class TransformerActor(pykka.ThreadingActor):
                 total_transactions = self.summary_calculator_actor.ask({"command": Command.GET_TOTAL_TRANSACTIONS, "data": parsed_data})
                 transaction_volume = self.summary_calculator_actor.ask({"command": Command.COMPUTE_TRANSACTION_VOLUME, "data": parsed_data})
                 repeat_customers = self.customer_analyser_actor.ask({"command": Command.GET_REPEAT_CUSTOMERS, "data": parsed_data})
-                cltv = self.customer_analyser_actor.ask({"command": Command.COMPUTE_CLTV, "data": parsed_data})
-                clusters = self.customer_analyser_actor.ask({"command": Command.CLUSTER_CUSTOMERS_FCM, "data": repeat_customers})
+                cltv = self.customer_analyser_actor.ask({"command": Command.COMPUTE_CLTV, "data": repeat_customers})
+                clusters = self.customer_analyser_actor.ask({"command": Command.CLUSTER_CUSTOMERS_FCM, "data": cltv})
                 weekly_trends = self.temporal_analyzer_actor.ask({"command": Command.COMPUTE_TIMESERIES, "data": parsed_data})
                 activity_heatmap = self.temporal_analyzer_actor.ask({"command": Command.GET_ACTIVITY_HEATMAP, "data": parsed_data})
 

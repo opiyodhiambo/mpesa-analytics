@@ -9,4 +9,7 @@ CREATE TABLE IF NOT EXISTS customers (
     is_churned BOOLEAN NOT NULL DEFAULT FALSE,
     churn_score NUMERIC(4, 2) NOT NULL DEFAULT 0.00,
     loyalty_score NUMERIC(10, 2) NOT NULL DEFAULT 0.00
-)
+);
+
+-- ALTER TABLE customers
+-- ADD COLUMN first_seen TIMESTAMP NOT NULL DEFAULT NOW();
