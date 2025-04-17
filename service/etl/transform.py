@@ -47,8 +47,6 @@ class TransactionTransformer:
         return round(df['transaction_amount'].sum(), 2)
 
 
-
-
     def get_repeat_customers(self, df: pd.DataFrame) -> pd.DataFrame:
         logging.info("Updating customer metrics")
 
@@ -86,6 +84,8 @@ class TransactionTransformer:
         df['hour'] = df['transaction_time'].dt.hour + 1
         df['day_of_week'] = df['transaction_time'].dt.day_name()
 
+        all_hours = list(range(1, 25))
+
         # Creating a new pivot table from the current batch
         new_pivot_table = df.pivot_table(
             index='day_of_week',
@@ -95,19 +95,12 @@ class TransactionTransformer:
             fill_value=0
         )
 
-        # Loading existing pivor table from the database
-        with self.db_engine.connect() as conn:
-            existing_pivot_table = pd.read_sql_table('peak_hours', conn, index_col='day_of_week')
+        # Sorting the days of the week from Monday to Sunday and filling missing hours
+        new_pivot_table = new_pivot_table.reindex(columns=all_hours, fill_value=0)
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        new_pivot_table = new_pivot_table.reindex(day_order)
 
-        # Combining the two pivot tables through unioned indexing
-        all_index = existing_pivot_table.index.union(new_pivot_table.index)
-        all_columns = existing_pivot_table.columns.union(new_pivot_table.columns)
-
-        existing_pivot_table = existing_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
-        new_pivot_table = new_pivot_table.reindex(index=all_index, columns=all_columns, fill_value=0)
-        combined_pivot_table = existing_pivot_table.add(new_pivot_table, fill_value=0).astype(int)
-
-        return combined_pivot_table
+        return new_pivot_table
 
 
     async def compute_timeseries(self, df: DataFrame) -> dict[str, DataFrame]:
