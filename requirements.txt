@@ -1,6 +1,5 @@
 fastapi==0.115.12 
 python-dotenv
-psycopg2
 pandas
 pykka==4.2.0
 dash==3.0.3 
@@ -9,3 +8,5 @@ dash-ag-grid==31.3.1
 plotly==6.0.1 
 psycopg2-binary
 apache-airflow==2.10.5
+uvicorn[standard]
+scikit-learn==1.6.1 

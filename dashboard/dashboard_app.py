@@ -1,3 +1,4 @@
+from flask import Flask
 import dash 
 import logging
 from dash import Dash, html, dcc, callback
@@ -16,7 +17,13 @@ logging.getLogger('dash').setLevel(logging.INFO)
 logging.getLogger('werkzeug').setLevel(logging.INFO)
 
 # Initialize Dash app (without Bootstrap)
-app = Dash(__name__)
+server = Flask(__name__) 
+app = Dash(
+    __name__,
+    server=server,
+    routes_pathname_prefix="/",
+    requests_pathname_prefix="/dashboard/"
+)
 app.title = "M-Pesa Analytics Dashboard"
 
 # Custom CSS for styling
@@ -218,7 +225,4 @@ app.layout = html.Div(style={
 
 register_callbacks(app=app)
 
-server = app.server
-
-def run():
-    app.run(debug=True, host="0.0.0.0", port=8050, use_reloader=False)
+__all__ = ["app"]
