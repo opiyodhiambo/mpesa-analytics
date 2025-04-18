@@ -40,3 +40,4 @@ def run_sql_scripts():
     conn.close()
     logging.info("Database setup completed.")
 
+run_sql_scripts()
