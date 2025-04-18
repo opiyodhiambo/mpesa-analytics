@@ -2,3 +2,4 @@ mpesaenv/
 .env
 playground.py
 __pycache__/
+logs/
